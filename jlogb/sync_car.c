@@ -44,6 +44,16 @@ void station_wait_for_car(struct station *station)
 
 void station_on_board(struct station *station)
 {
-	/* TODO: implementar na próxima etapa */
-	(void) station;
+	/* boarding_passengers é compartilhado com outros passageiros e com o vagão, então só pode mudar com o mutex. */
+	pthread_mutex_lock(&station->lock);
+
+	// se Este passageiro já sentou, então o vagão não precisa mais esperar por ele. //
+	station->boarding_passengers--;
+
+	/* Só o último pendente acorda o vagão, pois antes disso ele ainda não poderia partir. */
+	if (station->boarding_passengers == 0)
+		pthread_cond_signal(&station->all_boarded);
+
+	/* Liberar o mutex permite que o vagão acordado o readquira e que os demais passageiros avancem. */
+	pthread_mutex_unlock(&station->lock);
 }

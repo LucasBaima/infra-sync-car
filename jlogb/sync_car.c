@@ -12,9 +12,25 @@ void station_init(struct station *station)
 
 void station_load_car(struct station *station, int count)
 {
-	/* TODO: implementar na próxima etapa */
-	(void) station;
-	(void) count;
+	// Os contadores são compartilhados com os passageiros; sem exclusão mútua, atualizações se perderiam. //
+	pthread_mutex_lock(&station->lock);
+
+	
+	station->free_seats = count;
+
+	/* Broadcast porque vários passageiros podem embarcar; um signal acordaria só um e deixaria lugares ociosos. */
+	pthread_cond_broadcast(&station->car_arrived);
+
+	/* O vagão só parte quando ninguém está a caminho do assento e não há mais quem possa ocupar um lugar livre. */
+	while (station->boarding_passengers > 0 ||
+	       (station->free_seats > 0 && station->waiting_passengers > 0))
+		pthread_cond_wait(&station->all_boarded, &station->lock);
+
+	/* Zera os lugares para que um passageiro que chegue depois da partida não embarque num vagão que já saiu. */
+	station->free_seats = 0;
+
+	/* Libera o mutex para que o próximo vagão e os novos passageiros possam usar a estação. */
+	pthread_mutex_unlock(&station->lock);
 }
 
 void station_wait_for_car(struct station *station)
